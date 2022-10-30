@@ -86,7 +86,7 @@ public:
                 // lidar系到baselink系的变换
                 tfListener.lookupTransform(lidarFrame, baselinkFrame, ros::Time(0), lidar2Baselink);
             }
-            catch (tf::TransformException ex)
+            catch (tf::TransformException ex) //捕获异常
             {
                 ROS_ERROR("%s",ex.what());
             }
@@ -113,15 +113,17 @@ public:
         y = odom.pose.pose.position.y;
         z = odom.pose.pose.position.z;
         tf::Quaternion orientation;
-        tf::quaternionMsgToTF(odom.pose.pose.orientation, orientation);
-        tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
-        return pcl::getTransformation(x, y, z, roll, pitch, yaw);
+        tf::quaternionMsgToTF(odom.pose.pose.orientation, orientation);// 从ROS的四元数消息类型中得到 tf::Quaternion 类型的四元数。内部实现方式如下：
+        // q = Quaternion(msg_q.x, msg_q.y, msg_q.z, msg_q.w); // 构造四元数；
+       // 如果q模不为1，则 q.normalize(); （利用 normalize() 函数将其归一化）；
+        tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw); //将四元数转为旋转矩阵，然后变换为欧拉角
+        return pcl::getTransformation(x, y, z, roll, pitch, yaw);  //从给定的平移和欧拉角创建转换矩阵4X4
     }
 
     /**
      * 订阅激光里程计，来自mapOptimization
     */
-    void lidarOdometryHandler(const nav_msgs::Odometry::ConstPtr& odomMsg)
+    void lidarOdometryHandler(const nav_msgs::Odometry::ConstPtr& odomMsg)  //回调函数
     {
         std::lock_guard<std::mutex> lock(mtx);
         // 激光里程计对应变换矩阵
@@ -169,7 +171,7 @@ public:
         pcl::getTranslationAndEulerAngles(imuOdomAffineLast, x, y, z, roll, pitch, yaw);
         
         // 发布当前时刻里程计位姿
-        nav_msgs::Odometry laserOdometry = imuOdomQueue.back();
+        nav_msgs::Odometry laserOdometry = imuOdomQueue.back(); //位置和方向被更新，只保留原始的线速度和角加速度
         laserOdometry.pose.pose.position.x = x;
         laserOdometry.pose.pose.position.y = y;
         laserOdometry.pose.pose.position.z = z;
@@ -180,7 +182,7 @@ public:
         tf::Transform tCur;
         tf::poseMsgToTF(laserOdometry.pose.pose, tCur);
         if(lidarFrame != baselinkFrame)
-            tCur = tCur * lidar2Baselink;
+            tCur = tCur * lidar2Baselink;  //这里为什么是右乘
         tf::StampedTransform odom_2_baselink = tf::StampedTransform(tCur, odomMsg->header.stamp, odometryFrame, baselinkFrame);
         tfOdom2BaseLink.sendTransform(odom_2_baselink);
 
@@ -272,8 +274,8 @@ public:
     IMUPreintegration()
     {
         // 订阅imu原始数据，用下面因子图优化的结果，施加两帧之间的imu预计分量，预测每一时刻（imu频率）的imu里程计
-        subImu      = nh.subscribe<sensor_msgs::Imu>  (imuTopic,                   2000, &IMUPreintegration::imuHandler,      this, ros::TransportHints().tcpNoDelay());
-        // 订阅激光里程计，来自mapOptimization，用两帧之间的imu预计分量构建因子图，优化当前帧位姿（这个位姿仅用于更新每时刻的imu里程计，以及下一次因子图优化）
+        subImu      = nh.subscribe<sensor_msgs::Imu> (imuTopic,2000, &IMUPreintegration::imuHandler, this, ros::TransportHints().tcpNoDelay());
+        // 订阅激光里程计，来自mapOptimization，此处的激光里程计是两帧激光帧之间的位姿变换。用两帧之间的imu预计分量构建因子图，优化当前帧位姿（这个位姿仅用于更新每时刻的imu里程计，以及下一次因子图优化）
         subOdometry = nh.subscribe<nav_msgs::Odometry>("lio_sam/mapping/odometry_incremental", 5,    &IMUPreintegration::odometryHandler, this, ros::TransportHints().tcpNoDelay());
         
         // 发布imu里程计

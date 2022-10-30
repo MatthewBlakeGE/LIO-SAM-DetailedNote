@@ -1,5 +1,5 @@
 #pragma once
-#ifndef _UTILITY_LIDAR_ODOMETRY_H_
+#ifndef _UTILITY_LIDAR_ODOMETRY_H_   //如果宏没有定义，则编译下面代码
 #define _UTILITY_LIDAR_ODOMETRY_H_
 
 #include <ros/ros.h>
@@ -12,7 +12,7 @@
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
 #include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
+#include <visualization_msgs/MarkerArray.h> // rviz 显示
 
 #include <opencv2/opencv.hpp>
 
@@ -58,7 +58,7 @@ using namespace std;
 typedef pcl::PointXYZI PointType;
 
 // 传感器型号
-enum class SensorType { VELODYNE, OUSTER };
+enum class SensorType { VELODYNE, OUSTER };  //域化枚举
 
 class ParamServer
 {
@@ -81,13 +81,13 @@ public:
     string mapFrame;        // 世界坐标系
 
     // GPS参数
-    bool useImuHeadingInitialization;   //
-    bool useGpsElevation;
+    bool useImuHeadingInitialization;   //是否使用imu数据初始化gps
+    bool useGpsElevation; // 是否使用gps高度数据，gps高度估计误差大，一般不使用
     float gpsCovThreshold;
     float poseCovThreshold;
 
     // 保存PCD
-    bool savePCD;               // 是否保存地图
+    bool savePCD;               // 是否自动保存地图
     string savePCDDirectory;    // 保存路径
 
     // 激光传感器参数
@@ -99,12 +99,12 @@ public:
     float lidarMaxRange;    // 最大范围
 
     // IMU参数
-    float imuAccNoise;          // 加速度噪声标准差
-    float imuGyrNoise;          // 角速度噪声标准差
-    float imuAccBiasN;          //
+    float imuAccNoise;          // 加速度噪声白噪声
+    float imuGyrNoise;          // 角速度噪声白噪声
+    float imuAccBiasN;          //零偏
     float imuGyrBiasN;
     float imuGravity;           // 重力加速度
-    float imuRPYWeight;
+    float imuRPYWeight;   //欧拉角权重
     vector<double> extRotV;
     vector<double> extRPYV;
     vector<double> extTransV;
@@ -114,8 +114,8 @@ public:
     Eigen::Quaterniond extQRPY;
 
     // LOAM
-    float edgeThreshold;
-    float surfThreshold;
+    float edgeThreshold; //边缘特征阈值
+    float surfThreshold;  // 平面特征阈值
     int edgeFeatureMinValidNum;
     int surfFeatureMinValidNum;
 
@@ -129,7 +129,7 @@ public:
 
     // CPU Params
     int numberOfCores;
-    double mappingProcessInterval;
+    double mappingProcessInterval; //建图进程间隔
 
     // Surrounding map
     float surroundingkeyframeAddingDistThreshold; 
@@ -141,8 +141,8 @@ public:
     bool  loopClosureEnableFlag;
     float loopClosureFrequency;
     int   surroundingKeyframeSize;
-    float historyKeyframeSearchRadius;
-    float historyKeyframeSearchTimeDiff;
+    float historyKeyframeSearchRadius;   //回环搜索半径
+    float historyKeyframeSearchTimeDiff; //回环搜索时间差
     int   historyKeyframeSearchNum;
     float historyKeyframeFitnessScore;
 
@@ -207,11 +207,11 @@ public:
         nh.param<vector<double>>("lio_sam/extrinsicRot", extRotV, vector<double>());
         nh.param<vector<double>>("lio_sam/extrinsicRPY", extRPYV, vector<double>());
         nh.param<vector<double>>("lio_sam/extrinsicTrans", extTransV, vector<double>());
-        extRot = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extRotV.data(), 3, 3);
+        extRot = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extRotV.data(), 3, 3);    //Eigen::Map 可以复用数据内存，减小内存使用,Eigen::RowMajor选择以行优先存储。
         extRPY = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extRPYV.data(), 3, 3);
         extTrans = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extTransV.data(), 3, 1);
         extQRPY = Eigen::Quaterniond(extRPY);
-
+        
         nh.param<float>("lio_sam/edgeThreshold", edgeThreshold, 0.1);
         nh.param<float>("lio_sam/surfThreshold", surfThreshold, 0.1);
         nh.param<int>("lio_sam/edgeFeatureMinValidNum", edgeFeatureMinValidNum, 10);
@@ -244,7 +244,7 @@ public:
         nh.param<float>("lio_sam/globalMapVisualizationPoseDensity", globalMapVisualizationPoseDensity, 10.0);
         nh.param<float>("lio_sam/globalMapVisualizationLeafSize", globalMapVisualizationLeafSize, 1.0);
 
-        usleep(100);
+        usleep(100); //程序挂起100us
     }
 
     /**
@@ -255,19 +255,19 @@ public:
         sensor_msgs::Imu imu_out = imu_in;
         // 加速度，只跟xyz坐标系的旋转有关系
         Eigen::Vector3d acc(imu_in.linear_acceleration.x, imu_in.linear_acceleration.y, imu_in.linear_acceleration.z);
-        acc = extRot * acc;
+        acc = extRot * acc;   //此处的extRot为lidar到imu的旋转矩阵。向量不变，坐标系变化。
         imu_out.linear_acceleration.x = acc.x();
         imu_out.linear_acceleration.y = acc.y();
         imu_out.linear_acceleration.z = acc.z();
-        // 角速度，只跟xyz坐标系的旋转有关系
+        // 角速度，只跟xyz坐标系的旋转有关系，坐标系变换为绕y轴旋转正180度，易得旋转阵。（逆时针旋转为正）
         Eigen::Vector3d gyr(imu_in.angular_velocity.x, imu_in.angular_velocity.y, imu_in.angular_velocity.z);
         gyr = extRot * gyr;
         imu_out.angular_velocity.x = gyr.x();
         imu_out.angular_velocity.y = gyr.y();
         imu_out.angular_velocity.z = gyr.z();
-        // RPY
+        // RPY，作者给的RPY方向也不一致，坐标变换为绕Z轴转90度，易得旋转阵。
         Eigen::Quaterniond q_from(imu_in.orientation.w, imu_in.orientation.x, imu_in.orientation.y, imu_in.orientation.z);
-        // 为什么是右乘，可以动手画一下看看
+        // 为什么是右乘，因为作者提供反了。
         Eigen::Quaterniond q_final = q_from * extQRPY;
         imu_out.orientation.x = q_final.x();
         imu_out.orientation.y = q_final.y();
@@ -362,4 +362,4 @@ float pointDistance(PointType p1, PointType p2)
     return sqrt((p1.x-p2.x)*(p1.x-p2.x) + (p1.y-p2.y)*(p1.y-p2.y) + (p1.z-p2.z)*(p1.z-p2.z));
 }
 
-#endif
+#endif  //结束编译块

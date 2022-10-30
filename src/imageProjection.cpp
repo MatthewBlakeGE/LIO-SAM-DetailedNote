@@ -17,7 +17,7 @@ Date: 2021-02-21
     2、发布当前帧激光运动畸变校正之后的点云信息，包括点云数据、初始位姿、姿态角、有效点云数据等，发布给FeatureExtraction进行特征提取。
 **************************************************/  
 #include "utility.h"
-#include "lio_sam/cloud_info.h"
+//#include "lio_sam/cloud_info.h"
 
 
 /**
@@ -133,7 +133,7 @@ public:
      * 构造函数
     */
     ImageProjection():
-    deskewFlag(0)
+    deskewFlag(0)    // 初始化列表来初始化字段
     {
         // 订阅原始imu数据
         subImu        = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImageProjection::imuHandler, this, ros::TransportHints().tcpNoDelay());

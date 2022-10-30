@@ -38,14 +38,14 @@ lio_sam:
   imuGravity: 9.80511
   imuRPYWeight: 0.01
 
-  # Extrinsics (lidar -> IMU)
+  # Extrinsics (lidar -> IMU)  
   extrinsicTrans: [0.0, 0.0, 0.0]
   # extrinsicRot: [-1, 0, 0,
   #                 0, 1, 0,
   #                 0, 0, -1]
   # extrinsicRPY: [0,  1, 0,
   #                -1, 0, 0,
-  #                 0, 0, 1]
+  #                 0, 0, 1]    //作者此处的RPY给的是反的，给的是imu到lidar的
   extrinsicRot: [1, 0, 0,
                   0, 1, 0,
                   0, 0, 1]
